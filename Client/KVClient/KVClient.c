@@ -88,6 +88,7 @@ void *serverThread(void *args)
 	struct sockaddr_in client_addr, server_addr;
     int addrlen = sizeof(client_addr);
     char *xml = (char *)malloc((KEY_SIZE_M + VALUE_SIZE_M + 128)*sizeof(char));
+    char clientip[20];
     struct QUERY query;
     FILE *out_file;
 
@@ -102,6 +103,10 @@ void *serverThread(void *args)
 
 	while(1){
 	    new_fd = accept(client_fd, (struct sockaddr *)&server_addr,(socklen_t*)&addrlen);
+
+    	strcpy(clientip, inet_ntoa(server_addr.sin_addr));
+    	printf("Received reply from %s\n", clientip);
+
 		// Now reading the reply length from server in variable len
 		if (read(new_fd, &len, sizeof(int)) <= 0){
 			printf("Network Error: Could not receive data\n");
