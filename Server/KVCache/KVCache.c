@@ -9,6 +9,7 @@
 #include "../KVStore/KVStore.h"
 
 pthread_mutex_t store_lock;
+struct key_cache* keytable[65535];
 
 
 extern struct cache* cache_in_use;
@@ -49,13 +50,13 @@ struct cache* initialize_cache(int sets, int set_size) {
 
 static int
 hash_function(const char *s, int sets) {
-	unsigned const char *us;
-	unsigned long h;
-	h = 0; 
-	for(us = (unsigned const char *) s; *us; us++) {
-		h = h * MULTIPLIER + *us;
-	}
-	return h%sets;
+	unsigned long hash = 5381;
+    int c;
+
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return (int)hash%sets;
 }
 
 int del_key_from_keytable(char* key, int hash_value) {
@@ -66,7 +67,7 @@ int del_key_from_keytable(char* key, int hash_value) {
 		struct key_cache* p = keytable[hash_value];
 		struct key_cache* q = keytable[hash_value];
 		while(p != NULL) {
-			if ((strcmp(p->key, key) == 0) {
+			if (strcmp(p->key, key) == 0) {
 				/* code */
 				q->next = p->next;
 				free(p);
@@ -77,7 +78,6 @@ int del_key_from_keytable(char* key, int hash_value) {
 
 		}
 		return 0;	
-		
 	}
 }
 

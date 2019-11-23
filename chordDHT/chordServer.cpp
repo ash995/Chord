@@ -342,25 +342,25 @@ chord_ip find_successor(int id){
 	NODE _return;
 	chord_ip cip;
 	chord->find_successor(_return, id);
-	strcpy(chord_ip.ip, _return.ip);
+	strcpy(cip.ip, _return.ip.c_str());
 	return cip;
 }
 
-int main(int argc, char **argv) 
-{	
-	int my_id, join;
+// int main(int argc, char **argv) 
+// {	
+// 	int my_id, join;
 
-	if (argc != 5){
-		cout << "./exe my_id my_ip known_ip join " << endl;
-		exit(100);
-	}
-	my_id = atoi(argv[1]);
-	join = atoi(argv[4]);
+// 	if (argc != 5){
+// 		cout << "./exe my_id my_ip known_ip join " << endl;
+// 		exit(100);
+// 	}
+// 	my_id = atoi(argv[1]);
+// 	join = atoi(argv[4]);
 
-	chordInit(my_id, argv[2], argv[3], join);
+// 	chordInit(my_id, argv[2], argv[3], join);
 
-	return 0;
-}
+// 	return 0;
+// }
 
 // int main(int argc, char **argv) 
 // {	
