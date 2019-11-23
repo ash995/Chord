@@ -9,12 +9,14 @@
 
 #define BUFFER_SIZE 1026*256*8
 
+#define MULTIPLIER (97)
+
 // This is where the main work is done
 // rest of the functions are just for the management of the thread pool
 // and the request queue
 
 char *query_t[16] = {"GET", "PUT", "DEL", "GETR", "SUCCESS", "UNSUCCESS", "ERROR"};
-char buffer[BUFFER_SIZE];
+char buffer_tp[BUFFER_SIZE];
 
 extern struct cache* cache_in_use;
 
@@ -46,22 +48,22 @@ void process_get_request(struct QUERY* query, int fd) {
 	pthread_mutex_unlock(&(current_block->block_lock));
 
 	// build response xml
-	memset(buffer, 0, BUFFER_SIZE);
+	memset(buffer_tp, 0, BUFFER_SIZE);
 	// query->type = GETR;
 	// strcpy(query->value, value);
 	// strcpy(query)
-	XMLlib_build(buffer, q);
-	// printf("%s\n", buffer);
+	XMLlib_build(buffer_tp, q);
+	// printf("%s\n", buffer_tp);
 
 	// Writing length of message + 1 on socket
-	len = strlen(buffer) + 1;
+	len = strlen(buffer_tp) + 1;
 	write(fd, &len, sizeof(int));
 	// printf("%d\n", len);
 	// write response to fd
 	byte_w = 0;
 	while(byte_w < len){
 		// printf("IN Get write\n");
-		byte_w += write(fd, &buffer[byte_w], len - byte_w);
+		byte_w += write(fd, &buffer_tp[byte_w], len - byte_w);
 		// printf("%d\n", byte_w);
 	}
 
@@ -91,30 +93,30 @@ void process_put_request(struct QUERY* query, int fd) {
 	// print_cache(cache_in_use);
 
 	// build xml response
-	memset(buffer, 0, BUFFER_SIZE);
+	memset(buffer_tp, 0, BUFFER_SIZE);
 	// query->type = SUCCESS;
 	// strcpy(query->value, value);
 	// strcpy(query)
-	if (XMLlib_build(buffer, q) < 0) {
+	if (XMLlib_build(buffer_tp, q) < 0) {
 		// printf("XMLlib_build returned -1\n");
 	}
 
 	// write response to fd
-	// printf("reply to client ---- %s\n", buffer);
-	len = strlen(buffer) + 1;
+	// printf("reply to client ---- %s\n", buffer_tp);
+	len = strlen(buffer_tp) + 1;
 	write(fd, &len, sizeof(int));
 	byte_w = 0;
 
-	// printf("Buffer: \t==%s== buf_len = %d\n", buffer, len);
+	// printf("Buffer: \t==%s== buf_len = %d\n", buffer_tp, len);
 	// for (int k = 0; k < len; k++){
-	// 	if(buffer[k] == '\0'){
+	// 	if(buffer_tp[k] == '\0'){
 	// 		// printf("NULL\n");
 	// 	}
 	// }
 
 	while(byte_w < len){
 		// printf("IN PUT Write\n");
-		byte_w += write(fd, &buffer[byte_w], len - byte_w);
+		byte_w += write(fd, &buffer_tp[byte_w], len - byte_w);
 	}
 
 	close(fd);
@@ -136,19 +138,19 @@ void process_delete_request(struct QUERY* query, int fd) {
 	pthread_mutex_unlock(&(current_block->block_lock));
 
 	// build xml response
-	memset(buffer, 0, BUFFER_SIZE);
+	memset(buffer_tp, 0, BUFFER_SIZE);
 	// query->type = SUCCESS;
 	// strcpy(query->value, value);
 	// strcpy(query)
-	XMLlib_build(buffer, q);
+	XMLlib_build(buffer_tp, q);
 
 	// write response to fd
-	len = strlen(buffer) + 1;
+	len = strlen(buffer_tp) + 1;
 	write(fd, &len, sizeof(int));
 	byte_w = 0;
 	while(byte_w < len){
 		// printf("IN delete\n");
-		byte_w += write(fd, &buffer[byte_w], len - byte_w);
+		byte_w += write(fd, &buffer_tp[byte_w], len - byte_w);
 	}
 
 	close(fd);
@@ -175,15 +177,15 @@ void worker(void *arg) {
     	XMLlib_qinit(eq);
     	eq->type = UNSUCCESS;
     	eq->message = "Oversized Key";
-    	memset(buffer, 0 , BUFFER_SIZE);
-    	XMLlib_build(buffer, eq);
+    	memset(buffer_tp, 0 , BUFFER_SIZE);
+    	XMLlib_build(buffer_tp, eq);
 
-    	len = strlen(buffer) + 1;
+    	len = strlen(buffer_tp) + 1;
 		write(arg1->fd, &len, sizeof(int));
 		byte_w = 0;
 		while(byte_w < len){
 		// printf("IN delete\n");
-			byte_w += write(arg1->fd, &buffer[byte_w], len - byte_w);
+			byte_w += write(arg1->fd, &buffer_tp[byte_w], len - byte_w);
 		}
     }
     else if (strlen(query->value) > 256*1024) {
@@ -191,15 +193,15 @@ void worker(void *arg) {
     	XMLlib_qinit(eq);
     	eq->type = UNSUCCESS;
     	eq->message = "Oversized value";
-    	memset(buffer, 0 , BUFFER_SIZE);
-    	XMLlib_build(buffer, eq);
+    	memset(buffer_tp, 0 , BUFFER_SIZE);
+    	XMLlib_build(buffer_tp, eq);
 
-    	len = strlen(buffer) + 1;
+    	len = strlen(buffer_tp) + 1;
 		write(arg1->fd, &len, sizeof(int));
 		byte_w = 0;
 		while(byte_w < len){
 		// printf("IN delete\n");
-			byte_w += write(arg1->fd, &buffer[byte_w], len - byte_w);
+			byte_w += write(arg1->fd, &buffer_tp[byte_w], len - byte_w);
 		}
     }
     else if (query->type == 0) {
@@ -324,7 +326,7 @@ void* worker_function(void* args) {
 
 
 struct th_pool_t* thread_pool_create(int num_threads) {
-	// buffer = (char*)malloc(256*1024*8);
+	// buffer_tp = (char*)malloc(256*1024*8);
 	pthread_t thread;
 	struct th_pool_t* th_pool = (struct th_pool_t*)malloc(sizeof(struct th_pool_t));
 

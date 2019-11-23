@@ -11,11 +11,14 @@
 #include<string.h>
 #include<strings.h>
 #include<signal.h>
+#include <arpa/inet.h>
 #include "../KVCache/KVCache.h"
 #include "../KVStore/KVStore.h"
 #include "../../chordDHT/chord.h"
 
 #define MAX_BUFFER_SIZE 1026*256*8
+
+#define MULTIPLIER (97)
 
 // buffer to read in requests
 char buffer[MAX_BUFFER_SIZE];
@@ -24,11 +27,130 @@ char buffer[MAX_BUFFER_SIZE];
 struct th_pool_t* th_pool;
 struct cache* cache_in_use;
 
+struct query_params* q_params;
+
 // printing error messages
 void error(char *msg)
 {
 	perror(msg);
 	exit(1);
+}
+
+struct query_params {
+	int port;
+	int num_block;
+	int set_size;
+	int th_pool_size;
+	char* known_ip;
+	char* my_ip;
+	int join;
+	int my_id;
+};
+
+
+static int
+hash_function(const char *s, int sets) {
+	unsigned const char *us;
+	unsigned long h;
+	h = 0; 
+	for(us = (unsigned const char *) s; *us; us++) {
+		h = h * MULTIPLIER + *us;
+	}
+	return h%sets;
+}
+
+int get_fd_for_client() {
+	int socket_fd;
+	struct sockaddr_in serv_addr;
+	// int nbyte_w; 	// nbytes write(), read() done so far for a connection
+	// int nbyte_temp, len; 			// For temporary work
+	int PORT;
+
+	PORT = 9001;
+	if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) { 
+        printf("Network Error: Could not create socket\n");
+        // fprintf(out_file, "Network Error: Could not create socket\n");
+        exit(-1); 
+    }
+
+    serv_addr.sin_family = AF_INET; 
+    serv_addr.sin_port = htons(PORT);
+
+    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0){ 
+        // printf("Client: Invalid address given as command line argument. \n"); 
+        exit(-1); 
+    }
+
+    if (connect(socket_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) < 0) { 
+        printf("Network Error: Could not connect\n"); 
+        // fprintf(out_file, "Network Error: Could not connect\n");
+        exit(-1); 
+    }
+    return socket_fd;
+}
+
+void send_response_to_client(char* query) {
+	// get fd by connecting to client listening port
+	int fd = get_fd_for_client();
+	struct arg_t* args = setup_args(fd, strdup(query));
+	add_job_to_queue(th_pool, create_job(worker, (void*)args));
+}
+
+int send_query_to_server(char* server_ip, char* query) {
+	int socket_fd;
+	struct sockaddr_in serv_addr;
+	int nbyte_w; 	// nbytes write(), read() done so far for a connection
+	int nbyte_temp, len; 			// For temporary work
+	int PORT;
+
+	PORT = q_params->port;
+
+	if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) { 
+        printf("Network Error: Could not create socket\n");
+        // fprintf(out_file, "Network Error: Could not create socket\n");
+        exit(-1); 
+    }
+
+    serv_addr.sin_family = AF_INET; 
+    serv_addr.sin_port = htons(PORT);
+
+    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr) <= 0){ 
+        // printf("Client: Invalid address given as command line argument. \n"); 
+        exit(-1); 
+    }
+
+    if (connect(socket_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) < 0) { 
+        printf("Network Error: Could not connect\n"); 
+        // fprintf(out_file, "Network Error: Could not connect\n");
+        exit(-1); 
+    }
+
+    len = nbyte_w = strlen(query) + 1;	// +1 for the '\0' at last of string
+
+		// Writing length of the string on socket
+	if ((nbyte_temp = write(socket_fd, &len, sizeof(int))) < 0){
+			// printf("Client: socket broken\n");
+		exit(-1);
+	}
+
+	// Send the whole xml buffer. Big xml may not be sent in 1 shot. So while()
+	// printf("Sending:             %s\n", xml);
+	while (nbyte_w > 0){
+		// printf("in while nbyte_w = %d ", nbyte_w);
+
+		if ((nbyte_temp = write(socket_fd, &query[len - nbyte_w], nbyte_w)) < 0){
+			printf("Network Error: Could not send data. exiting\n");
+			// fprintf(out_file, "Network Error: Could not send data\n");
+			exit(-1);
+		}
+		// printf("One write done nbyte_temp = %d\n", nbyte_temp);
+		nbyte_w -= nbyte_temp;
+		if (nbyte_w < 0){
+			// printf("Client: Some calculation error\n");
+			exit(-1);
+		}
+	}
+
 }
 
 // int ijh = 0;
@@ -59,9 +181,9 @@ void* process(void* filed) {
     	XMLlib_qinit(query);
     	XMLlib_parse(buffer, query);
 
-    	struct chord_ip = find_successor(hash_function(query->key, 65535));
+    	chord_ip ch = find_successor(hash_function(query->key, 65535));
 
-    	if (strcmp(chord_ip.ip, q_params->my_ip) == 0)
+    	if (strcmp(ch.ip, q_params->my_ip) == 0)
     	{
     		// process normally with recieve_query
     		send_response_to_client(buffer);
@@ -69,7 +191,7 @@ void* process(void* filed) {
     	else {
     		// send request to ip returned in find successor
 
-    		send_query_to_server(chord_ip.ip, buffer);
+    		send_query_to_server(ch.ip, buffer);
 
     	}
 
@@ -93,113 +215,24 @@ void* process(void* filed) {
 	return NULL;
 }
 
-void transfer_keys(int start_hash, int end_hash) {
-	int i = start_hash;
-	for (; i < end_hash; ++i) {
-		struct key_cache* keyc = get_keys_by_hash(i);
-		while(keyc != NULL) {
-			char* key = keyc->key;
-			struct block* current_block = get_current_block(cache_in_use, key);
-			struct QUERY* qu = get_entry_from_cache(current_block, key, cache_in_use->set_size);
-			transfer_key_to_remote(qu->key, qu->value);
-			qu = del_entry_from_cache(current_block, key, cache_in_use->set_size);
-		}
-	}
-}
+// void transfer_keys(int start_hash, int end_hash) {
+// 	int i = start_hash;
+// 	for (; i < end_hash; ++i) {
+// 		struct key_cache* keyc = get_keys_by_hash(i);
+// 		while(keyc != NULL) {
+// 			char* key = keyc->key;
+// 			struct block* current_block = get_current_block(cache_in_use, key);
+// 			struct QUERY* qu = get_entry_from_cache(current_block, key, cache_in_use->set_size);
+// 			transfer_key_to_remote(qu->key, qu->value);
+// 			qu = del_entry_from_cache(current_block, key, cache_in_use->set_size);
+// 		}
+// 	}
+// }
 
-void send_response_to_client(char* query) {
-	// get fd by connecting to client listening port
-	int fd = get_fd_for_client();
-	struct arg_t* args = setup_args(fd, strdup(query));
-	add_job_to_queue(th_pool, create_job(worker, (void*)args));
-}
 
-int send_query_to_server(char* server_ip, char* query) {
-	int socket_fd;
-	struct sockaddr_in serv_addr;
-	int nbyte_w; 	// nbytes write(), read() done so far for a connection
-	int nbyte_temp, len; 			// For temporary work
-	int PORT;
 
-	PORT = q_params->port;
 
-	if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) { 
-        printf("Network Error: Could not create socket\n");
-        fprintf(out_file, "Network Error: Could not create socket\n");
-        exit(-1); 
-    }
 
-    serv_addr.sin_family = AF_INET; 
-    serv_addr.sin_port = htons(PORT);
-
-    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr) <= 0){ 
-        // printf("Client: Invalid address given as command line argument. \n"); 
-        exit(-1); 
-    }
-
-    if (connect(socket_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) < 0) { 
-        printf("Network Error: Could not connect\n"); 
-        fprintf(out_file, "Network Error: Could not connect\n");
-        exit(-1); 
-    }
-
-    len = nbyte_w = strlen(query) + 1;	// +1 for the '\0' at last of string
-
-		// Writing length of the string on socket
-	if ((nbyte_temp = write(socket_fd, &len, sizeof(int))) < 0){
-			// printf("Client: socket broken\n");
-		exit(-1);
-	}
-
-	// Send the whole xml buffer. Big xml may not be sent in 1 shot. So while()
-	// printf("Sending:             %s\n", xml);
-	while (nbyte_w > 0){
-		// printf("in while nbyte_w = %d ", nbyte_w);
-
-		if ((nbyte_temp = write(socket_fd, &query[len - nbyte_w], nbyte_w)) < 0){
-			printf("Network Error: Could not send data. exiting\n");
-			fprintf(out_file, "Network Error: Could not send data\n");
-			exit(-1);
-		}
-		// printf("One write done nbyte_temp = %d\n", nbyte_temp);
-		nbyte_w -= nbyte_temp;
-		if (nbyte_w < 0){
-			// printf("Client: Some calculation error\n");
-			exit(-1);
-		}
-	}
-
-}
-
-int get_fd_for_client() {
-	int socket_fd;
-	struct sockaddr_in serv_addr;
-	// int nbyte_w; 	// nbytes write(), read() done so far for a connection
-	// int nbyte_temp, len; 			// For temporary work
-	int PORT;
-
-	PORT = 9001;
-	if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) { 
-        printf("Network Error: Could not create socket\n");
-        fprintf(out_file, "Network Error: Could not create socket\n");
-        exit(-1); 
-    }
-
-    serv_addr.sin_family = AF_INET; 
-    serv_addr.sin_port = htons(PORT);
-
-    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0){ 
-        // printf("Client: Invalid address given as command line argument. \n"); 
-        exit(-1); 
-    }
-
-    if (connect(socket_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) < 0) { 
-        printf("Network Error: Could not connect\n"); 
-        fprintf(out_file, "Network Error: Could not connect\n");
-        exit(-1); 
-    }
-    return socket_fd;
-}
 
 void sig_handler(int signum){
     // printf("Received signal %d\n", signum);
@@ -207,27 +240,8 @@ void sig_handler(int signum){
     exit(1);
 }
 
-struct query_params {
-	int port;
-	int num_block;
-	int set_size;
-	int th_pool_size;
-	char* known_ip;
-	char* my_ip;
-	int join;
-	int my_id;
-};
 
-static int
-hash_function(const char *s, int sets) {
-	unsigned const char *us;
-	unsigned long h;
-	h = 0; 
-	for(us = (unsigned const char *) s; *us; us++) {
-		h = h * MULTIPLIER + *us;
-	}
-	return h%sets;
-}
+
 
 void parse_query(char* argv, struct query_params* q_params) {
 	// char str[] = "Geeks-for-Geeks"; 
@@ -279,7 +293,7 @@ void parse_query(char* argv, struct query_params* q_params) {
 
 pthread_t process_thread;
 
-struct query_params* q_params;
+
 
 
 int main(int argc, char *argv[])
@@ -355,8 +369,8 @@ int main(int argc, char *argv[])
 	// continuously accept requests and serve them
 	while (1) {
 	 
-		int fd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-		int* fd_arg = malloc(sizeof(*fd_arg));
+		int fd = accept(sockfd, (struct sockaddr *) &cli_addr, (socklen_t*)&clilen);
+		int* fd_arg = (int*)malloc(sizeof(*fd_arg));
 		*fd_arg = fd;
 		pthread_create(&process_thread, NULL, process, fd_arg);
 		// process(fd);

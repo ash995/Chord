@@ -1,12 +1,10 @@
 #pragma once
 #include "../XMLlib/XMLlib.h"
 
-struct key_cache* keytable[65535];
-
 struct key_cache {
 	char* key;
 	struct key_cache* next;
-}
+};
 
 struct cache {
 	struct block** cache_block;
@@ -29,7 +27,7 @@ struct entry {
 };
 
 void put_key_in_keytable(char* key, int hash_value);
-void del_key_from_keytable(char* key, int hash_value);
+int del_key_from_keytable(char* key, int hash_value);
 struct cache* initialize_cache(int sets, int set_size);
 struct QUERY* put_entry_in_cache(struct block* current_block, char* key, char* value, int set_size);
 struct QUERY* get_entry_from_cache(struct block* current_block, char* key, int set_size);

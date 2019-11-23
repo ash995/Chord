@@ -9,6 +9,7 @@
 #include "../KVStore/KVStore.h"
 
 pthread_mutex_t store_lock;
+struct key_cache* keytable[65535];
 
 
 extern struct cache* cache_in_use;
@@ -66,7 +67,7 @@ int del_key_from_keytable(char* key, int hash_value) {
 		struct key_cache* p = keytable[hash_value];
 		struct key_cache* q = keytable[hash_value];
 		while(p != NULL) {
-			if ((strcmp(p->key, key) == 0) {
+			if (strcmp(p->key, key) == 0) {
 				/* code */
 				q->next = p->next;
 				free(p);
@@ -77,7 +78,6 @@ int del_key_from_keytable(char* key, int hash_value) {
 
 		}
 		return 0;	
-		
 	}
 }
 
