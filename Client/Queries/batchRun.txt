@@ -1,0 +1,16 @@
+PUT,ash,ashwin
+PUT,abh,abhik
+PUT,kar,karthik
+PUT,ros,roshan
+PUT,bha,bhavesh
+PUT,tar,tarini
+PUT,sai,sairam
+PUT,sri,srijani
+PUT,sar,sarika
+PUT,mam,manu
+GET,abh
+GET,abh
+DEL,abh
+PUT,man,mansi
+GET,abh
+DEL,abh
