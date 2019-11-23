@@ -59,23 +59,28 @@ void* process(void* filed) {
     	XMLlib_qinit(query);
     	XMLlib_parse(buffer, query);
 
-    	if (find_successor(hash_function(query->key, 65535)) == q_params->my_id)
+    	struct chord_ip = find_successor(hash_function(query->key, 65535));
+
+    	if (strcmp(chord_ip.ip, q_params->my_ip) == 0)
     	{
     		// process normally with recieve_query
     		recieve_query(buffer);
     	}
     	else {
-    		// send request to id returned in find successor
+    		// send request to ip returned in find successor
+
+    		send_query_to_server(chord_ip.ip, buffer);
+
     	}
 
 
-		struct arg_t* args = setup_args(fd, strdup(buffer));
+			// struct arg_t* args = setup_args(fd, strdup(buffer));
 
 		// printf("%d ----- %s -- %d\n", args->fd, args->request_string, n);
 	
 		// pass the string and fd to the request pool
 	
-		add_job_to_queue(th_pool, create_job(worker, (void*)args));
+			// add_job_to_queue(th_pool, create_job(worker, (void*)args));
 		// printf("%d -> %s\n", fd, buffer);
 		// n = write(fd,"I got your message",18);
 		// if (n < 0)
@@ -104,8 +109,96 @@ void transfer_keys(int start_hash, int end_hash) {
 
 void receive_query(char* query) {
 	// get fd by connecting to client listening port
+	int fd = get_fd_for_client();
 	struct arg_t* args = setup_args(fd, strdup(query));
 	add_job_to_queue(th_pool, create_job(worker, (void*)args));
+}
+
+int send_query_to_server(char* server_ip, char* query) {
+	int socket_fd;
+	struct sockaddr_in serv_addr;
+	int nbyte_w; 	// nbytes write(), read() done so far for a connection
+	int nbyte_temp, len; 			// For temporary work
+	int PORT;
+
+	PORT = q_params->port;
+
+	if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) { 
+        printf("Network Error: Could not create socket\n");
+        fprintf(out_file, "Network Error: Could not create socket\n");
+        exit(-1); 
+    }
+
+    serv_addr.sin_family = AF_INET; 
+    serv_addr.sin_port = htons(PORT);
+
+    if(inet_pton(AF_INET, server_ip, &serv_addr.sin_addr) <= 0){ 
+        // printf("Client: Invalid address given as command line argument. \n"); 
+        exit(-1); 
+    }
+
+    if (connect(socket_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) < 0) { 
+        printf("Network Error: Could not connect\n"); 
+        fprintf(out_file, "Network Error: Could not connect\n");
+        exit(-1); 
+    }
+
+    len = nbyte_w = strlen(query) + 1;	// +1 for the '\0' at last of string
+
+		// Writing length of the string on socket
+	if ((nbyte_temp = write(socket_fd, &len, sizeof(int))) < 0){
+			// printf("Client: socket broken\n");
+		exit(-1);
+	}
+
+	// Send the whole xml buffer. Big xml may not be sent in 1 shot. So while()
+	// printf("Sending:             %s\n", xml);
+	while (nbyte_w > 0){
+		// printf("in while nbyte_w = %d ", nbyte_w);
+
+		if ((nbyte_temp = write(socket_fd, &query[len - nbyte_w], nbyte_w)) < 0){
+			printf("Network Error: Could not send data. exiting\n");
+			fprintf(out_file, "Network Error: Could not send data\n");
+			exit(-1);
+		}
+		// printf("One write done nbyte_temp = %d\n", nbyte_temp);
+		nbyte_w -= nbyte_temp;
+		if (nbyte_w < 0){
+			// printf("Client: Some calculation error\n");
+			exit(-1);
+		}
+	}
+
+}
+
+int get_fd_for_client() {
+	int socket_fd;
+	struct sockaddr_in serv_addr;
+	// int nbyte_w; 	// nbytes write(), read() done so far for a connection
+	// int nbyte_temp, len; 			// For temporary work
+	int PORT;
+
+	PORT = 9001;
+	if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) { 
+        printf("Network Error: Could not create socket\n");
+        fprintf(out_file, "Network Error: Could not create socket\n");
+        exit(-1); 
+    }
+
+    serv_addr.sin_family = AF_INET; 
+    serv_addr.sin_port = htons(PORT);
+
+    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0){ 
+        // printf("Client: Invalid address given as command line argument. \n"); 
+        exit(-1); 
+    }
+
+    if (connect(socket_fd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) < 0) { 
+        printf("Network Error: Could not connect\n"); 
+        fprintf(out_file, "Network Error: Could not connect\n");
+        exit(-1); 
+    }
+    return socket_fd;
 }
 
 void sig_handler(int signum){

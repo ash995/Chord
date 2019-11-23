@@ -65,6 +65,8 @@ void process_get_request(struct QUERY* query, int fd) {
 		// printf("%d\n", byte_w);
 	}
 
+	close(fd);
+
 }
 
 void process_put_request(struct QUERY* query, int fd) {
@@ -114,6 +116,8 @@ void process_put_request(struct QUERY* query, int fd) {
 		// printf("IN PUT Write\n");
 		byte_w += write(fd, &buffer[byte_w], len - byte_w);
 	}
+
+	close(fd);
 }
 
 void process_delete_request(struct QUERY* query, int fd) {
@@ -146,6 +150,8 @@ void process_delete_request(struct QUERY* query, int fd) {
 		// printf("IN delete\n");
 		byte_w += write(fd, &buffer[byte_w], len - byte_w);
 	}
+
+	close(fd);
 }
 
 void worker(void *arg) {
