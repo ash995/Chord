@@ -64,7 +64,7 @@ void* process(void* filed) {
     	if (strcmp(chord_ip.ip, q_params->my_ip) == 0)
     	{
     		// process normally with recieve_query
-    		recieve_query(buffer);
+    		send_response_to_client(buffer);
     	}
     	else {
     		// send request to ip returned in find successor
@@ -107,7 +107,7 @@ void transfer_keys(int start_hash, int end_hash) {
 	}
 }
 
-void receive_query(char* query) {
+void send_response_to_client(char* query) {
 	// get fd by connecting to client listening port
 	int fd = get_fd_for_client();
 	struct arg_t* args = setup_args(fd, strdup(query));
