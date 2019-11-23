@@ -47,8 +47,8 @@ struct query_params {
 	int my_id;
 };
 
-static int
-hash_function(const char *s, int sets) {
+int
+hash_function(char *s, int sets) {
 	unsigned long hash = 5381;
     int c;
 

@@ -23,16 +23,16 @@ extern struct cache* cache_in_use;
 pthread_mutex_t keytable_lock;
 
 
-static int
-hash_function(const char *s, int sets) {
-	unsigned long hash = 5381;
-    int c;
+// static int
+// hash_function(const char *s, int sets) {
+// 	unsigned long hash = 5381;
+//     int c;
 
-    while (c = *s++)
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+//     while (c = *s++)
+//         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
-    return (int)hash%sets;
-}
+//     return (int)hash%sets;
+// }
 
 void process_get_request(struct QUERY* query, int fd) {
 	int byte_w, len;

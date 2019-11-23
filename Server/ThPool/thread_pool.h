@@ -31,3 +31,4 @@ struct th_pool_t* thread_pool_create(int num_threads);
 struct arg_t* setup_args(int fd, char* request_message);
 void worker(void* args);
 // struct arg_t* setup_args(int fd, char* str);
+int hash_function(char *s, int sets);

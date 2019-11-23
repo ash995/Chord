@@ -48,16 +48,16 @@ struct cache* initialize_cache(int sets, int set_size) {
 
 #define MULTIPLIER (97)
 
-static int
-hash_function(const char *s, int sets) {
-	unsigned long hash = 5381;
-    int c;
+// static int
+// hash_function(const char *s, int sets) {
+// 	unsigned long hash = 5381;
+//     int c;
 
-    while (c = *s++)
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+//     while (c = *s++)
+//         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
-    return (int)hash%sets;
-}
+//     return (int)hash%sets;
+// }
 
 int del_key_from_keytable(char* key, int hash_value) {
 	if (keytable[hash_value] == NULL) {

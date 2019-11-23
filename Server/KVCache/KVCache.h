@@ -34,5 +34,6 @@ struct QUERY* get_entry_from_cache(struct block* current_block, char* key, int s
 struct QUERY* del_entry_from_cache(struct block* current_block, char* key, int set_size);
 void print_cache(struct cache* cache_in_use);
 struct block* get_current_block(struct cache* cache_in_use, char* key);
+int hash_function(char *s, int sets);
 
 
