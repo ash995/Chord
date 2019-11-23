@@ -30,6 +30,10 @@ using namespace apache::thrift::server;
 #define CHORD_M		16
 #define NTHREAD		4
 
+struct chord_ip{
+	char ip[16];
+};
+
 class chordDHT : public chordDHTIf {
 private:
 	NODE_INFO node_info;
@@ -334,10 +338,12 @@ int chordInit(int my_id, char *my_ip, char *known_ip, int join)
 	return 1;
 }
 
-int find_successor(int id){
+chord_ip find_successor(int id){
 	NODE _return;
+	chord_ip cip;
 	chord->find_successor(_return, id);
-	return _return.id;
+	strcpy(chord_ip.ip, _return.ip);
+	return cip;
 }
 
 int main(int argc, char **argv) 
