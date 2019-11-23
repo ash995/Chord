@@ -220,13 +220,13 @@ struct query_params {
 
 static int
 hash_function(const char *s, int sets) {
-	unsigned const char *us;
-	unsigned long h;
-	h = 0; 
-	for(us = (unsigned const char *) s; *us; us++) {
-		h = h * MULTIPLIER + *us;
-	}
-	return h%sets;
+	unsigned long hash = 5381;
+    int c;
+
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return (int)hash%sets;
 }
 
 void parse_query(char* argv, struct query_params* q_params) {
