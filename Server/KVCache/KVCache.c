@@ -53,7 +53,7 @@ hash_function(const char *s, int sets) {
 	unsigned long hash = 5381;
     int c;
 
-    while (c = *str++)
+    while (c = *s++)
         hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
     return (int)hash%sets;
