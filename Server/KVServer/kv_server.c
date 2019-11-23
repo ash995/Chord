@@ -13,6 +13,7 @@
 #include<signal.h>
 #include "../KVCache/KVCache.h"
 #include "../KVStore/KVStore.h"
+#include "../../chordDHT/chord.h"
 
 #define MAX_BUFFER_SIZE 1026*256*8
 
@@ -58,9 +59,10 @@ void* process(void* filed) {
     	XMLlib_qinit(query);
     	XMLlib_parse(buffer, query);
 
-    	if (find_successor(query->key) == my_id)
+    	if (find_successor(hash_function(query->key, 65535)) == q_params->my_id)
     	{
     		// process normally with recieve_query
+    		recieve_query(buffer);
     	}
     	else {
     		// send request to id returned in find successor
@@ -202,6 +204,8 @@ int main(int argc, char *argv[])
 	}
 
 	q_params->my_id = hash_function(q_params->my_ip, 65535);
+
+	int x = chordInit(q_params->my_id, q_params->my_ip, q_params->known_ip, q_params->join);
 
 	// printf("%d\n", q_params->port);
 	// printf("%d\n", q_params->num_block);
