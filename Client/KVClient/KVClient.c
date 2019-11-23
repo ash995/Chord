@@ -6,10 +6,13 @@
 #include <netinet/in.h> 
 #include <unistd.h>
 #include <arpa/inet.h> 
+#include <pthread.h>
 #include "../XMLlib/XMLlib.h"
 
 #define KEY_SIZE_M		256
 #define VALUE_SIZE_M	262144
+#define S_PORT 			9001		// Clint starts a server on this port
+#define CLIENT_IP		"127.0.0.1"	// Clint starts a server on this IP
 // #define PORT 			8000
 
 int query_make (struct QUERY * query, char *buff)
@@ -79,6 +82,53 @@ int write_reply_to_file(struct QUERY *query, FILE * out_file)
 	return 1;
 }
 
+void *serverThread(void *args)
+{
+	int client_fd, new_fd, nbyte_r, len;
+	struct sockaddr_in client_addr, server_addr;
+    int addrlen = sizeof(client_addr);
+    char *xml = (char *)malloc((KEY_SIZE_M + VALUE_SIZE_M + 128)*sizeof(char));
+    struct QUERY query;
+    FILE *out_file;
+
+    out_file = (FILE *)args;
+
+    client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_port = htons(S_PORT);
+    inet_pton(AF_INET, CLIENT_IP, &client_addr.sin_addr);
+    bind(client_fd, (struct sockaddr *)&client_addr, sizeof(client_addr));
+    listen(client_fd, 50);
+
+	while(1){
+	    new_fd = accept(client_fd, (struct sockaddr *)&server_addr,(socklen_t*)&addrlen);
+		// Now reading the reply length from server in variable len
+		if (read(new_fd, &len, sizeof(int)) <= 0){
+			printf("Network Error: Could not receive data\n");
+			fprintf(out_file, "Network Error: Could not receive data\n");
+			exit(-1);
+		}
+		// printf("length received %d\n", len);
+		nbyte_r=0;
+		while(len > nbyte_r){
+			nbyte_r += read(new_fd, &xml[nbyte_r], len - nbyte_r);
+			if (nbyte_r < 0){
+				exit (-1);
+			}
+		}
+
+		if (XMLlib_parse(xml, &query) < 0){
+			exit(-1);
+		}
+		// printf("Parsing done\n");
+
+		if (write_reply_to_file(&query, out_file) < 0){
+			// printf("Client: Unable to write to o/p file\n");
+			exit(-1);
+		}
+	}
+}
+
 int main (int argc, char **argv)
 {
 	FILE *in_file, *out_file;
@@ -90,6 +140,7 @@ int main (int argc, char **argv)
 	int nbyte_w, nbyte_r; 	// nbytes write(), read() done so far for a connection
 	int nbyte_temp, len; 			// For temporary work
 	int PORT;
+	pthread_t tid = 1;
 
 	if (argc != 5){
 		printf("./client in_file out_file server_ip server_port\n");
@@ -112,6 +163,7 @@ int main (int argc, char **argv)
         exit(-1); 
     }
 
+
     serv_addr.sin_family = AF_INET; 
     serv_addr.sin_port = htons(PORT);
 
@@ -130,6 +182,9 @@ int main (int argc, char **argv)
 	input = (char *)malloc((KEY_SIZE_M + VALUE_SIZE_M + 128)*sizeof(char));
 	xml = (char *)malloc((KEY_SIZE_M + VALUE_SIZE_M + 128)*sizeof(char));
 	XMLlib_debugon();	// For dubug purpouse
+
+	// Starting Client-server 
+	pthread_create(&tid, NULL, serverThread, (void *)out_file);
 
 	while (fgets(input, KEY_SIZE_M + VALUE_SIZE_M + 128, in_file)){
 		if (query_make(&query, input) < 0){
@@ -154,6 +209,7 @@ int main (int argc, char **argv)
 
 		// Send the whole xml buffer. Big xml may not be sent in 1 shot. So while()
 		// printf("Sending:             %s\n", xml);
+
 		while (nbyte_w > 0){
 			// printf("in while nbyte_w = %d ", nbyte_w);
 
@@ -179,44 +235,45 @@ int main (int argc, char **argv)
 
 		// printf("Starting read\n");
 
-		// Now reading the reply length from server in variable len
-		if (read(socket_fd, &len, sizeof(int)) <= 0){
-			printf("Network Error: Could not receive data\n");
-			fprintf(out_file, "Network Error: Could not receive data\n");
-			exit(-1);
-		}
-		// printf("length received %d\n", len);
-		nbyte_r=0;
-		while(len > nbyte_r){
-			// printf("nbyte_r before read %d\n", nbyte_r);
-			nbyte_r += read(socket_fd, &xml[nbyte_r], len - nbyte_r);
-			// printf("received some xml with nbyte_r = %d\n", nbyte_r);
-			for (int k = 0; k < nbyte_r; k++){
-				if (xml[k] == '\0'){
-					// printf("%d th 0 received\n", k);
-				}
-				// printf("%c", xml[k]);
-			}
-			// printf("Some xml print done\n");
-			if (nbyte_r < 0){
-				// TO DO: This has to be handled carefully
-				// printf("Unable to read from socket\n");
-				exit (-1);
-			}
-		}
+		// // Now reading the reply length from server in variable len
+		// if (read(socket_fd, &len, sizeof(int)) <= 0){
+		// 	printf("Network Error: Could not receive data\n");
+		// 	fprintf(out_file, "Network Error: Could not receive data\n");
+		// 	exit(-1);
+		// }
+		sleep(2);
+		// // printf("length received %d\n", len);
+		// nbyte_r=0;
+		// while(len > nbyte_r){
+		// 	// printf("nbyte_r before read %d\n", nbyte_r);
+		// 	nbyte_r += read(socket_fd, &xml[nbyte_r], len - nbyte_r);
+		// 	// printf("received some xml with nbyte_r = %d\n", nbyte_r);
+		// 	for (int k = 0; k < nbyte_r; k++){
+		// 		if (xml[k] == '\0'){
+		// 			// printf("%d th 0 received\n", k);
+		// 		}
+		// 		// printf("%c", xml[k]);
+		// 	}
+		// 	// printf("Some xml print done\n");
+		// 	if (nbyte_r < 0){
+		// 		// TO DO: This has to be handled carefully
+		// 		// printf("Unable to read from socket\n");
+		// 		exit (-1);
+		// 	}
+		// }
 
-		// printf("Reply before parse \t\t==%s==\n", xml);
-		// printf("Parsing start\n");
-		if (XMLlib_parse(xml, &query) < 0){
-			// printf("Client: Unable to parse received string. XMLlib_parse returned -1\n");
-			exit(-1);
-		}
-		// printf("Parsing done\n");
+		// // printf("Reply before parse \t\t==%s==\n", xml);
+		// // printf("Parsing start\n");
+		// if (XMLlib_parse(xml, &query) < 0){
+		// 	// printf("Client: Unable to parse received string. XMLlib_parse returned -1\n");
+		// 	exit(-1);
+		// }
+		// // printf("Parsing done\n");
 
-		if (write_reply_to_file(&query, out_file) < 0){
-			// printf("Client: Unable to write to o/p file\n");
-			exit(-1);
-		}
+		// if (write_reply_to_file(&query, out_file) < 0){
+		// 	// printf("Client: Unable to write to o/p file\n");
+		// 	exit(-1);
+		// }
 		// printf("Write to file done\n");
 	}
 	close(socket_fd);
